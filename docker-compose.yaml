@@ -1,0 +1,68 @@
+version: '3'
+
+services:
+
+  dockerhost:
+    image: qoomon/docker-host
+    cap_add: [ 'NET_ADMIN', 'NET_RAW' ]
+    restart: on-failure
+
+  kong-database:
+    image: postgres:9.5
+    environment:
+      - POSTGRES_USER=kong
+      - POSTGRES_DB=kong
+      - POSTGRES_PASSWORD=kong
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kong:
+    image: kong:2.2.0-centos
+    depends_on:
+      - kong-database
+    environment:
+      - KONG_LUA_SSL_VERIFY_DEPTH=3
+      - KONG_LUA_SSL_TRUSTED_CERTIFICATE=/etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt
+      - KONG_DATABASE=postgres
+      - KONG_PG_HOST=kong-database
+      - KONG_PG_PASSWORD=kong
+      - KONG_PROXY_ACCESS_LOG=/dev/stdout
+      - KONG_ADMIN_ACCESS_LOG=/dev/stdout
+      - KONG_PROXY_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_LISTEN=0.0.0.0:8001
+      - KONG_LOG_LEVEL=debug
+      - KONG_PLUGINS=bundled,${NAME}
+      - KONG_NGINX_HTTP_INCLUDE=/plugin-development/kong-http-include.conf
+    volumes:
+      - plugin-development:/plugin-development
+    user: "0:0"
+    command:
+      - /bin/bash
+      - -c
+      - |
+        sleep 12
+        mkdir -p /usr/local/lib/luarocks/rocks-5.1/kong-plugin-${NAME}/${VERSION}-1/
+        ln -s /plugin-development/kong-plugin-${NAME}-${VERSION}-1.rockspec /usr/local/lib/luarocks/rocks-5.1/kong-plugin-${NAME}/${VERSION}-1/kong-plugin-${NAME}-${VERSION}-1.rockspec
+        ln -s /plugin-development/kong/plugins/${NAME} /usr/local/share/lua/5.1/kong/plugins/${NAME}
+        kong migrations bootstrap
+        kong migrations list
+        kong migrations up
+        /usr/local/bin/kong start --run-migrations --vv
+    ports:
+      - "7999:7999"
+      - "8000:8000"
+      - "8001:8001"
+
+
+volumes:
+
+  plugin-development:
+    driver: local
+    driver_opts:
+       type: none
+       o: bind
+       device: ${PWD}/
