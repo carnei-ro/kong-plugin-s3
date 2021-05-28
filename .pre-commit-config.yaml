@@ -1,0 +1,26 @@
+---
+repos:
+  - repo: local
+    hooks:
+      - id: update-readme
+        name: Update README.md file
+        description: Update README.md file.
+        entry: ./update_readme.sh "" ""
+        language: script
+        pass_filenames: false
+        files: '.*\.lua'
+  - repo: git://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+      - id: check-added-large-files
+      - id: check-byte-order-marker
+      - id: check-executables-have-shebangs
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+  - repo: git://github.com/igorshubovych/markdownlint-cli
+    rev: v0.27.1
+    hooks:
+      - id: markdownlint
