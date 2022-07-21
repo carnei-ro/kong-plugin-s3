@@ -22,6 +22,7 @@ Version: **0.1.0**
 | config.rewrites | **map[string][string]** (*check `'config.rewrites' object`) | false | <pre>"/": "/index.html"</pre> |  |
 | config.host | **string** | false |  |  |
 | config.port | **integer** | false | <pre>443</pre> | <pre>- between:<br/>  - 0<br/>  - 65535</pre> |
+| config.keys | **array[string]** | false | | |
 
 ### 'config.rewrites' object
 
@@ -44,5 +45,6 @@ plugins:
     rewrites: {}
     host: ''
     port: 443
+    keys: ["random-file.txt"]
 ```
 <!-- END OF KONG-PLUGIN DOCS HOOK -->
