@@ -55,6 +55,23 @@ function _M.execute(conf)
   local host = (conf['host'] ~= nil) and conf['host'] or (bucket_name .. '.s3.amazonaws.com')
   local port = (conf['port'] ~= nil) and conf['port'] or 443
 
+  local keys = conf['keys']
+  if keys ~= nil then
+    local key = ngx.unescape_uri(bucket_key)
+    local key_contains = false
+
+    for _, v in pairs(keys) do
+      if v == key then
+        key_contains = true
+        break
+      end
+    end
+
+    if #keys > 0 and not key_contains then
+      return kong.response.exit(404)
+    end
+  end
+
   local opts = {
     region = conf.aws_region,
     service = 's3',
