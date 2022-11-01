@@ -16,7 +16,7 @@ describe("[" .. PLUGIN_NAME .. "] access", function()
         ["/"] = "/index.html"
       },
     }
-    
+
     ngx.var = { upstream_uri = "/" }
 
     local req = execute(conf)
@@ -37,7 +37,7 @@ describe("[" .. PLUGIN_NAME .. "] access", function()
         ["/"] = "/index.html"
       },
     }
-    
+
     ngx.var = { upstream_uri = "/foo" }
 
     local req = execute(conf)
@@ -60,7 +60,7 @@ describe("[" .. PLUGIN_NAME .. "] access", function()
         ["/"] = "/index.html"
       },
     }
-    
+
     ngx.var = { upstream_uri = "/my-bucket-key" }
 
     local req = execute(conf)

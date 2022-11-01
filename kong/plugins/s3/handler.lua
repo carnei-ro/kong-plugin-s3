@@ -3,7 +3,7 @@ local access = require("kong.plugins." .. plugin_name .. ".access")
 
 local plugin = {
   PRIORITY = 750,
-  VERSION = "0.1.0",
+  VERSION = "0.2.0",
 }
 
 function plugin:access(plugin_conf)
@@ -13,6 +13,10 @@ function plugin:access(plugin_conf)
   kong.service.request.set_path(req.path)
   kong.service.set_target(req.host, req.port)
   kong.service.request.set_headers(req.headers)
+
+  if plugin_conf.clear_query_string then
+    kong.service.request.set_raw_query('')
+  end
 end
 
 return plugin

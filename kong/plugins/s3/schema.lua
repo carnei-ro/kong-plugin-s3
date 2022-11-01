@@ -49,6 +49,13 @@ return {
         } },
         { host = typedefs.host },
         { port = typedefs.port { default = 443 }, },
+        {
+          clear_query_string = {
+            type = "boolean",
+            default = false,
+            required = true
+          }
+        },
       }
     },
   } },

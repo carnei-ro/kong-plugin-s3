@@ -3,10 +3,8 @@ version: '3'
 services:
 
   kong:
-    image: kong:2.1.2-centos
+    image: kong:3.0-ubuntu
     environment:
-      - KONG_LUA_SSL_VERIFY_DEPTH=3
-      - KONG_LUA_SSL_TRUSTED_CERTIFICATE=/etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt
       - KONG_PROXY_ACCESS_LOG=/dev/stdout
       - KONG_ADMIN_ACCESS_LOG=/dev/stdout
       - KONG_PROXY_ERROR_LOG=/dev/stderr
@@ -15,8 +13,8 @@ services:
       - KONG_LOG_LEVEL=debug
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/plugin-development/kong.yml
-      - KONG_NGINX_HTTP_INCLUDE=/plugin-development/kong-http-include.conf
       - KONG_PLUGINS=bundled,${NAME}
+      - KONG_MYPLUGIN_SOMEDATA={"foo":"bar","baz":"cux"}
     volumes:
       - plugin-development:/plugin-development
     user: "0:0"
@@ -29,7 +27,6 @@ services:
         ln -s /plugin-development/kong/plugins/${NAME} /usr/local/share/lua/5.1/kong/plugins/${NAME}
         /docker-entrypoint.sh kong start --vv
     ports:
-      - "7999:7999"
       - "8000:8000"
       - "8001:8001"
 

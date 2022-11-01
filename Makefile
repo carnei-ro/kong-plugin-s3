@@ -1,4 +1,4 @@
-VERSION := $(shell sed -n "s/.*VERSION.*= \"\{1,\}\(.*\)\"/\1/p;" kong/plugins/*/handler.lua | tr -d ',')
+VERSION := $(shell sed -n "s/.*VERSION.*= \"\{1,\}\(.*\)\"/\1/p;"  kong/plugins/*/handler.lua | tr -d ',')
 NAME := $(shell ls kong/plugins)
 DIR_NAME=$(shell basename $${PWD})
 UID := $(shell id -u)
@@ -13,7 +13,7 @@ DOCKER_COMPOSE_FILE := docker-compose-dbless.yaml
 endif
 
 ifeq ($(origin KONG_VERSION),undefined)
-KONG_VERSION := 2.1.2
+KONG_VERSION := 3.0.0
 endif
 
 help:  ## Display this help
@@ -23,8 +23,8 @@ help:  ## Display this help
 build: rockspec validate ## Build / Pack the plugin. Output at the ./dist directory
 	@find kong/plugins/${NAME}/ -type f -iname "*lua~" -exec rm -f {} \;
 	@docker run --rm -u 0 -v ${PWD}:/plugin \
-		--entrypoint /bin/bash kong:2.0.3-centos \
-		-c "cd /plugin ; yum install -q -y zip; luarocks make > /dev/null 2>&1 ; luarocks pack kong-plugin-${NAME} 2> /dev/null ; chown ${UID}:${GID} *.rock"
+		--entrypoint /bin/bash kong:3.0 \
+		-c "cd /plugin ; apk add --no-cache zip; luarocks make > /dev/null 2>&1 ; luarocks pack kong-plugin-${NAME} 2> /dev/null ; chown ${UID}:${GID} *.rock"
 	@mkdir -p dist
 	@mv *.rock dist/
 	@printf '\n\n Check "dist" folder \n\n'
@@ -79,28 +79,28 @@ stop: ## Stop the containers.
 logs: kong-logs ## Show Kong container logs.
 .PHONY: kong-logs
 kong-logs: ## Same as logs.
-	@docker logs -f $$(docker ps -qf name=${DIR_NAME}_kong_1) 2>&1 || true
+	@docker logs -f $$(docker ps -qf name=${DIR_NAME}-kong-1) 2>&1 || true
 
 .PHONY: shell
 shell: kong-bash ## Docker exec into Kong container shell.
 .PHONY: kong-bash
 kong-bash: ## Same as shell.
-	@docker exec -it $$(docker ps -qf name=${DIR_NAME}_kong_1) bash || true
+	@docker exec -it $$(docker ps -qf name=${DIR_NAME}-kong-1) bash || true
 
 .PHONY: reload
 reload: kong-reload ## Perform Kong Reload into Kong container.
 .PHONY: kong-reload
 kong-reload: ## Same as reload.
-	@docker exec -it $$(docker ps -qf name=${DIR_NAME}_kong_1) bash -c "/usr/local/bin/kong reload"
+	@docker exec -it $$(docker ps -qf name=${DIR_NAME}-kong-1) bash -c "/usr/local/bin/kong reload"
 
 .PHONY: restart
 restart: ## Remove Kong container and recreate it.
-	@docker rm -vf $$(docker ps -qf name=${DIR_NAME}_kong_1)
+	@docker rm -vf $$(docker ps -qf name=${DIR_NAME}-kong-1)
 	@docker-compose -f ${DOCKER_COMPOSE_FILE} up -d
 
 .PHONY: truncate-logs
 truncate-logs: ## Needs sudo privileges: truncate Kong Container logs.
-	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' ${DIR_NAME}_kong_1)
+	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' ${DIR_NAME}-kong-1)
 
 .PHONY: reconfigure
 reconfigure: clean start kong-logs ## Shortcut to clean, start, logs.
@@ -123,7 +123,7 @@ req-aux: ## GET /aux endpoint.
 
 .PHONY: resty-script
 resty-script: ## Execute inside Kong Container the 'resty-script.lua' file.
-	@docker exec -it $$(docker ps -qf name=${DIR_NAME}_kong_1) /usr/local/openresty/bin/resty /plugin-development/resty-script.lua || true
+	@docker exec -it $$(docker ps -qf name=${DIR_NAME}-kong-1) /usr/local/openresty/bin/resty /plugin-development/resty-script.lua || true
 
 .PHONY: config
 config: ## Works only with Database: Create a 'httpbin' service and '/' route. Add the custom-plugin to the '/' route.
@@ -151,4 +151,4 @@ lint: rockspec ## Execute 'pongo' lint
 
 .PHONY: update-readme
 update-readme: ## Depends on Kong up and running: Updates 'Plugin Priority', 'Plugin Version', 'Configs' and 'Usage' sections from README.md file.
-	@./update_readme.sh ${NAME}
+	@./update_readme.sh ${NAME} "http://${DIR_NAME}-kong-1:8001/schemas/plugins/" "http://${DIR_NAME}-kong-1:8001/"
