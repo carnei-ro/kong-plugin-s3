@@ -9,15 +9,20 @@ Priority: **750**
 
 ## Plugin Version
 
-Version: **0.2.0**
+Version: **0.3.0**
 
 ## Config
 
+&ast; This field is _referenceable_, which means it can be securely stored as a [secret](https://docs.konghq.com/gateway/latest/kong-enterprise/secrets-management/) in a vault. References must follow a [specific format](https://docs.konghq.com/gateway/latest/kong-enterprise/secrets-management/reference-format/).
+
 | name | type | required | validations | default |
 |-----|-----|-----|-----|-----|
-| aws_key | string | <pre>false</pre> |  |  |
-| aws_secret | string | <pre>false</pre> |  |  |
-| aws_region | string | <pre>true</pre> |  |  |
+| aws_key* | string | <pre>false</pre> |  |  |
+| aws_secret* | string | <pre>false</pre> |  |  |
+| aws_assume_role_arn* | string | <pre>false</pre> |  |  |
+| aws_role_session_name | string | <pre>false</pre> |  | <pre>kong</pre> |
+| aws_region | string | <pre>false</pre> |  |  |
+| aws_imds_protocol_version | string | <pre>true</pre> | <pre>- one_of:<br/>  - v1<br/>  - v2</pre> | <pre>v1</pre> |
 | bucket_name | string | <pre>true</pre> |  |  |
 | rewrites | map[string][string] | <pre>false</pre> |  | <pre>/: /index.html</pre> |
 | host | string | <pre>false</pre> |  |  |
@@ -33,7 +38,10 @@ plugins:
     config:
       aws_key: ''
       aws_secret: ''
+      aws_assume_role_arn: ''
+      aws_role_session_name: kong
       aws_region: ''
+      aws_imds_protocol_version: v1
       bucket_name: ''
       rewrites:
         /: /index.html

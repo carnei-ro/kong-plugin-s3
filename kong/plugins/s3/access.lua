@@ -1,24 +1,55 @@
-local kong        = kong
-local plugin_name = ({...})[1]:match("^kong%.plugins%.([^%.]+)")
-local aws_v4      = require("kong.plugins." .. plugin_name .. ".v4")
+local plugin_name           = ({...})[1]:match("^kong%.plugins%.([^%.]+)")
+local aws_v4                = require("kong.plugins." .. plugin_name .. ".v4")
+local aws_ecs_cred_provider = require("kong.plugins." .. plugin_name .. ".iam-ecs-credentials")
+local aws_ec2_cred_provider = require("kong.plugins." .. plugin_name .. ".iam-ec2-credentials")
 
-local _M = {} --empty table to receive our functions
+local ngx  = ngx
+local kong = kong
 
-local IAM_CREDENTIALS_CACHE_KEY = "plugin." .. plugin_name .. ".iam_role_temp_creds"
+local getenv = os.getenv
 
-local fetch_credentials
-do
-  local credential_sources = {
-    require("kong.plugins." .. plugin_name .. ".iam-ecs-credentials"),
-    -- The EC2 one will always return `configured == true`, so must be the last!
-    require("kong.plugins." .. plugin_name .. ".iam-ec2-credentials"),
-  }
+local _M = {}
 
-  for _, credential_source in ipairs(credential_sources) do
-    if credential_source.configured then
-      fetch_credentials = credential_source.fetchCredentials
-      break
+local IAM_CREDENTIALS_CACHE_KEY_PATTERN = "plugin."..plugin_name..".iam_role_temp_creds.%s"
+local AWS_PORT = 443
+local AWS_REGION do
+  AWS_REGION = getenv("AWS_REGION") or getenv("AWS_DEFAULT_REGION")
+end
+local fmt = string.format
+
+local function fetch_aws_credentials(conf)
+  local fetch_metadata_credentials do
+    local metadata_credentials_source = {
+      aws_ecs_cred_provider,
+      -- The EC2 one will always return `configured == true`, so must be the last!
+      aws_ec2_cred_provider,
+    }
+
+    for _, credential_source in ipairs(metadata_credentials_source) do
+      if credential_source.configured then
+        fetch_metadata_credentials = credential_source.fetchCredentials
+        break
+      end
     end
+  end
+
+  if conf.aws_assume_role_arn then
+    local metadata_credentials, err = fetch_metadata_credentials(conf)
+
+    if err then
+      return nil, err
+    end
+
+    local aws_sts_cred_source = require("kong.plugins.".. plugin_name ..".iam-sts-credentials")
+    return aws_sts_cred_source.fetch_assume_role_credentials(conf.aws_region,
+                                                             conf.aws_assume_role_arn,
+                                                             conf.aws_role_session_name,
+                                                             metadata_credentials.access_key,
+                                                             metadata_credentials.secret_key,
+                                                             metadata_credentials.session_token)
+
+  else
+    return fetch_metadata_credentials(conf)
   end
 end
 
@@ -26,10 +57,12 @@ local function patch_table_with_aws_credentials(conf, opts)
   -- Get AWS Access and Secret Key from conf or AWS Access, Secret Key and Token from cache or iam role
   if not conf.aws_key then
     -- no credentials provided, so try the IAM metadata service
+    local iam_role_cred_cache_key = fmt(IAM_CREDENTIALS_CACHE_KEY_PATTERN, conf.aws_assume_role_arn or "default")
     local iam_role_credentials = kong.cache:get(
-      IAM_CREDENTIALS_CACHE_KEY,
+      iam_role_cred_cache_key,
       nil,
-      fetch_credentials
+      fetch_aws_credentials,
+      conf
     )
 
     if not iam_role_credentials then
@@ -52,11 +85,13 @@ function _M.execute(conf)
   local bucket_key = ((conf['rewrites'] ~= nil) and (conf['rewrites'][ngx.var.upstream_uri] ~= nil)) and conf['rewrites'][ngx.var.upstream_uri] or ngx.var.upstream_uri
   local bucket_name = conf.bucket_name
 
-  local host = (conf['host'] ~= nil) and conf['host'] or (bucket_name .. '.s3.amazonaws.com')
-  local port = (conf['port'] ~= nil) and conf['port'] or 443
+  local region = conf.aws_region or AWS_REGION
+
+  local host = (conf['host'] ~= nil) and conf['host'] or (fmt("s3.%s.amazonaws.com", region))
+  local port = (conf['port'] ~= nil) and conf['port'] or AWS_PORT
 
   local opts = {
-    region = conf.aws_region,
+    region = region,
     service = 's3',
     method = 'GET',
     headers = {
@@ -67,7 +102,7 @@ function _M.execute(conf)
     host = host,
     port = port,
     query = nil,
-    body = nil, 
+    body = nil,
   }
 
   patch_table_with_aws_credentials(conf, opts)

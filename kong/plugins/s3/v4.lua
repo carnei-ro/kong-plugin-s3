@@ -79,22 +79,25 @@ local function derive_signing_key(kSecret, date, region, service)
 end
 
 local function prepare_awsv4_request(tbl)
-  local domain = tbl.domain or "amazonaws.com"
   local region = tbl.region
   local service = tbl.service
   local request_method = tbl.method
   local canonicalURI = tbl.canonicalURI
   local path = tbl.path
+  local host = tbl.host
+
   if path and not canonicalURI then
     canonicalURI = canonicalise_path(path)
   elseif canonicalURI == nil or canonicalURI == "" then
     canonicalURI = "/"
   end
+
   local canonical_querystring = tbl.canonical_querystring
   local query = tbl.query
   if query and not canonical_querystring then
     canonical_querystring = canonicalise_query_string(query)
   end
+
   local req_headers = tbl.headers or {}
   local req_payload = tbl.body
   local access_key = tbl.access_key
@@ -106,16 +109,17 @@ local function prepare_awsv4_request(tbl)
       return nil, "either 'signing_key' or 'secret_key' must be provided"
     end
   end
+
   local tls = tbl.tls
   if tls == nil then
     tls = true
   end
+
   local port = tbl.port or (tls and 443 or 80)
   local timestamp = tbl.timestamp or ngx.time()
   local req_date = os.date("!%Y%m%dT%H%M%SZ", timestamp)
   local date = os.date("!%Y%m%d", timestamp)
 
-  local host = service .. "." .. region .. "." .. domain
   local host_header do -- If the "standard" port is not in use, the port should be added to the Host header
     local with_port
     if tls then

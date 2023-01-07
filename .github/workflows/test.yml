@@ -1,0 +1,62 @@
+name: "Test"
+
+concurrency:
+  group: ${{ github.workflow }} ${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  pull_request: {}
+  push:
+    branches:
+      - main
+  # schedule:
+  #   - cron: "0 0 * * *" # every day at midnight, to test against nightlies
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        kongVersion:
+          - "2.8.x"
+          - "3.0.x"
+          - "3.1.x"
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: Kong/kong-pongo-action@v1
+        with:
+          pongo_version: master
+          kong_version: ${{ matrix.kongVersion }}
+
+      - run: pongo run -- --coverage
+
+      # Optional upload of coverage data,
+      # just ugly, something to fix...
+      - uses: leafo/gh-actions-lua@v8
+        if: success()
+      - uses: leafo/gh-actions-luarocks@v4
+        if: success()
+      - name: Report test coverage
+        if: success()
+        continue-on-error: true
+        run: |
+          luarocks install luacov-coveralls
+          # hack: luacov config file has a path for inside the pongo container
+          # rewrite those to the local location in GHA
+          if [ -f .luacov ]; then
+            cp .luacov .luacov_backup
+            cat .luacov_backup | sed 's/\/kong-plugin\/luacov./luacov./' > .luacov
+          fi
+          rm *.report.out
+          luacov-coveralls
+          #luacov-coveralls --output coveralls.out
+          # undo the hack
+          if [ -f .luacov_backup ]; then
+            mv .luacov_backup .luacov
+          fi
+        env:
+          COVERALLS_REPO_TOKEN: ${{ github.token }}

@@ -1,0 +1,33 @@
+name: Check README Documentation
+
+concurrency:
+  group: ${{ github.workflow }} ${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  pull_request: {}
+  push:
+    branches:
+      - main
+
+jobs:
+  readme:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Check if it has diffs
+        run: |
+          make start
+          make update-readme
+          git diff --exit-code README.md
+          if [ $? -eq 0 ]; then
+            echo "No changes to README.md"
+          else
+            echo "Changes to README.md"
+            git diff
+            echo "Please run 'make update-readme' and commit the changes"
+            exit 1
+          fi

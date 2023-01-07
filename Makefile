@@ -3,13 +3,14 @@ NAME := $(shell ls kong/plugins)
 DIR_NAME=$(shell basename $${PWD})
 UID := $(shell id -u)
 GID := $(shell id -g)
+CONTAINER_NAME := $(shell docker-compose ps 2>/dev/null | grep 8000 | awk '{print $$1}')
 SUMMARY := $(shell sed -n '/^summary: /s/^summary: //p' README.md)
 export UID GID NAME VERSION
 
 .DEFAULT_GOAL:=help
 
 ifeq ($(origin DOCKER_COMPOSE_FILE),undefined)
-DOCKER_COMPOSE_FILE := docker-compose-dbless.yaml
+DOCKER_COMPOSE_FILE := docker-compose.yaml
 endif
 
 ifeq ($(origin KONG_VERSION),undefined)
@@ -79,28 +80,28 @@ stop: ## Stop the containers.
 logs: kong-logs ## Show Kong container logs.
 .PHONY: kong-logs
 kong-logs: ## Same as logs.
-	@docker logs -f $$(docker ps -qf name=${DIR_NAME}-kong-1) 2>&1 || true
+	@docker logs -f $$(docker ps -qf name=$(docker-compose ps 2>/dev/null | grep 8000 | awk '{print $1}')) 2>&1 || true
 
 .PHONY: shell
 shell: kong-bash ## Docker exec into Kong container shell.
 .PHONY: kong-bash
 kong-bash: ## Same as shell.
-	@docker exec -it $$(docker ps -qf name=${DIR_NAME}-kong-1) bash || true
+	@docker exec -it $$(docker ps -qf name=$(docker-compose ps 2>/dev/null | grep 8000 | awk '{print $1}')) bash || true
 
 .PHONY: reload
 reload: kong-reload ## Perform Kong Reload into Kong container.
 .PHONY: kong-reload
 kong-reload: ## Same as reload.
-	@docker exec -it $$(docker ps -qf name=${DIR_NAME}-kong-1) bash -c "/usr/local/bin/kong reload"
+	@docker exec -it $$(docker ps -qf name=$(docker-compose ps 2>/dev/null | grep 8000 | awk '{print $1}')) bash -c "/usr/local/bin/kong reload"
 
 .PHONY: restart
 restart: ## Remove Kong container and recreate it.
-	@docker rm -vf $$(docker ps -qf name=${DIR_NAME}-kong-1)
+	@docker rm -vf $$(docker ps -qf name=$(docker-compose ps 2>/dev/null | grep 8000 | awk '{print $1}'))
 	@docker-compose -f ${DOCKER_COMPOSE_FILE} up -d
 
 .PHONY: truncate-logs
 truncate-logs: ## Needs sudo privileges: truncate Kong Container logs.
-	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' ${DIR_NAME}-kong-1)
+	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' $(docker-compose ps 2>/dev/null | grep 8000 | awk '{print $1}'))
 
 .PHONY: reconfigure
 reconfigure: clean start kong-logs ## Shortcut to clean, start, logs.
@@ -123,7 +124,7 @@ req-aux: ## GET /aux endpoint.
 
 .PHONY: resty-script
 resty-script: ## Execute inside Kong Container the 'resty-script.lua' file.
-	@docker exec -it $$(docker ps -qf name=${DIR_NAME}-kong-1) /usr/local/openresty/bin/resty /plugin-development/resty-script.lua || true
+	@docker exec -it $$(docker ps -qf name=$(docker-compose ps 2>/dev/null | grep 8000 | awk '{print $1}')) /usr/local/openresty/bin/resty /plugin-development/resty-script.lua || true
 
 .PHONY: config
 config: ## Works only with Database: Create a 'httpbin' service and '/' route. Add the custom-plugin to the '/' route.
@@ -151,4 +152,4 @@ lint: rockspec ## Execute 'pongo' lint
 
 .PHONY: update-readme
 update-readme: ## Depends on Kong up and running: Updates 'Plugin Priority', 'Plugin Version', 'Configs' and 'Usage' sections from README.md file.
-	@./update_readme.sh ${NAME} "http://${DIR_NAME}-kong-1:8001/schemas/plugins/" "http://${DIR_NAME}-kong-1:8001/"
+	@./update_readme.sh ${NAME} "http://${CONTAINER_NAME}:8001/schemas/plugins/" "http://${CONTAINER_NAME}:8001/"

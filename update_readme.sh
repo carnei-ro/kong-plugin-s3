@@ -14,7 +14,7 @@ END=$(nl -ba README.md | grep 'END OF KONG-PLUGIN DOCS HOOK' | awk '{print $1}')
 head -n${BEGIN} README.md > README-B
 tail -n +${END} README.md > README-E
 
-docker run --network=$(basename ${PWD})_default --rm leandrocarneiro/kong-plugin-schema-to-markdown:3.0 ${PLUGIN_NAME} ${KONG_SCHEMA_ENDPOINT} ${KONG_PLUGIN_METADATA_ENDPOINT} | sed "s/\r//g" >> README-B
+docker run --network=kong-plugin-development --rm leandrocarneiro/kong-plugin-schema-to-markdown:3.0 ${PLUGIN_NAME} ${KONG_SCHEMA_ENDPOINT} ${KONG_PLUGIN_METADATA_ENDPOINT} | sed "s/\r//g" >> README-B
 
 cat README-B README-E > README.md
 rm -f README-B README-E
