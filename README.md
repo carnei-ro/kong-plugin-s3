@@ -9,7 +9,7 @@ Priority: **750**
 
 ## Plugin Version
 
-Version: **0.3.0**
+Version: **0.4.0**
 
 ## Config
 
@@ -20,6 +20,9 @@ Version: **0.3.0**
 | aws_key* | string | <pre>false</pre> |  |  |
 | aws_secret* | string | <pre>false</pre> |  |  |
 | aws_assume_role_arn* | string | <pre>false</pre> |  |  |
+| aws_web_identity_credential | boolean | <pre>false</pre> |  | <pre>true</pre> |
+| aws_web_identity_token_file | string | <pre>false</pre> |  |  |
+| aws_web_identity_role_arn | string | <pre>false</pre> |  |  |
 | aws_role_session_name | string | <pre>false</pre> |  | <pre>kong</pre> |
 | aws_region | string | <pre>false</pre> |  |  |
 | aws_imds_protocol_version | string | <pre>true</pre> | <pre>- one_of:<br/>  - v1<br/>  - v2</pre> | <pre>v1</pre> |
@@ -39,6 +42,9 @@ plugins:
       aws_key: ''
       aws_secret: ''
       aws_assume_role_arn: ''
+      aws_web_identity_credential: true
+      aws_web_identity_token_file: ''
+      aws_web_identity_role_arn: ''
       aws_role_session_name: kong
       aws_region: ''
       aws_imds_protocol_version: v1

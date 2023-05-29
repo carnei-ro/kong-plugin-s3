@@ -2,6 +2,7 @@ local plugin_name           = ({...})[1]:match("^kong%.plugins%.([^%.]+)")
 local aws_v4                = require("kong.plugins." .. plugin_name .. ".v4")
 local aws_ecs_cred_provider = require("kong.plugins." .. plugin_name .. ".iam-ecs-credentials")
 local aws_ec2_cred_provider = require("kong.plugins." .. plugin_name .. ".iam-ec2-credentials")
+local aws_sts_cred_source = require("kong.plugins." .. plugin_name .. ".iam-sts-credentials")
 
 local ngx  = ngx
 local kong = kong
@@ -15,9 +16,15 @@ local AWS_PORT = 443
 local AWS_REGION do
   AWS_REGION = getenv("AWS_REGION") or getenv("AWS_DEFAULT_REGION")
 end
+local AWS_ROLE_ARN do
+  AWS_ROLE_ARN = os.getenv("AWS_ROLE_ARN")
+end
+local AWS_WEB_IDENTITY_TOKEN_FILE do
+  AWS_WEB_IDENTITY_TOKEN_FILE = os.getenv("AWS_WEB_IDENTITY_TOKEN_FILE")
+end
 local fmt = string.format
 
-local function fetch_aws_credentials(conf)
+local function fetch_aws_credentials(aws_conf)
   local fetch_metadata_credentials do
     local metadata_credentials_source = {
       aws_ecs_cred_provider,
@@ -33,23 +40,44 @@ local function fetch_aws_credentials(conf)
     end
   end
 
-  if conf.aws_assume_role_arn then
-    local metadata_credentials, err = fetch_metadata_credentials(conf)
+  if aws_conf.aws_assume_role_arn then
+    local metadata_credentials, err
+
+    if aws_conf.aws_web_identity_credential then
+      local err_wic
+      metadata_credentials, err_wic = aws_sts_cred_source.fetchCredentials(aws_conf)
+      if err_wic then
+        kong.log.err(err_wic, " falling back to fetch_metadata_credentials")
+      end
+    end
+
+    if (metadata_credentials == nil) or (not metadata_credentials.access_key) then
+      metadata_credentials, err = fetch_metadata_credentials(aws_conf)
+    end
 
     if err then
       return nil, err
     end
 
-    local aws_sts_cred_source = require("kong.plugins.".. plugin_name ..".iam-sts-credentials")
-    return aws_sts_cred_source.fetch_assume_role_credentials(conf.aws_region,
-                                                             conf.aws_assume_role_arn,
-                                                             conf.aws_role_session_name,
+    return aws_sts_cred_source.fetch_assume_role_credentials(aws_conf.aws_region,
+                                                             aws_conf.aws_assume_role_arn,
+                                                             aws_conf.aws_role_session_name,
                                                              metadata_credentials.access_key,
                                                              metadata_credentials.secret_key,
                                                              metadata_credentials.session_token)
 
   else
-    return fetch_metadata_credentials(conf)
+    if not aws_conf.aws_web_identity_credential then
+      return fetch_metadata_credentials(aws_conf)
+    end
+
+    local credentials, err
+    credentials, err = aws_sts_cred_source.fetchCredentials(aws_conf)
+    if err then
+      kong.log.err(err, " falling back to fetch_metadata_credentials")
+      return fetch_metadata_credentials(aws_conf)
+    end
+    return credentials
   end
 end
 
@@ -83,7 +111,18 @@ end
 
 function _M.execute(conf)
   local bucket_key = ((conf['rewrites'] ~= nil) and (conf['rewrites'][ngx.var.upstream_uri] ~= nil)) and conf['rewrites'][ngx.var.upstream_uri] or ngx.var.upstream_uri
+  if not bucket_key then
+    bucket_key = ((conf['rewrites'] ~= nil) and (conf['rewrites'][ngx.var.request_uri] ~= nil)) and conf['rewrites'][ngx.var.request_uri] or ngx.var.request_uri
+  end
+  if not bucket_key then
+    kong.log.err("bucket_key is nil")
+    bucket_key = '/index.html'
+  end
+
   local bucket_name = conf.bucket_name
+
+  conf.aws_web_identity_token_file = conf.aws_web_identity_token_file and conf.aws_web_identity_token_file or AWS_WEB_IDENTITY_TOKEN_FILE
+  conf.aws_web_identity_role_arn = conf.aws_web_identity_role_arn and conf.aws_web_identity_role_arn or AWS_ROLE_ARN
 
   local region = conf.aws_region or AWS_REGION
 
