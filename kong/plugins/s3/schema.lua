@@ -23,6 +23,18 @@ return {
           encrypted = true, -- Kong Enterprise-exclusive feature, does nothing in Kong CE
           referenceable = true,
         } },
+        { aws_web_identity_credential = {
+          type = "boolean",
+          default = true,
+        } },
+        { aws_web_identity_token_file = {
+          type = "string",
+          required = false,
+        } },
+        { aws_web_identity_role_arn = {
+          type = "string",
+          required = false,
+        } },
         { aws_role_session_name = {
           type = "string",
           default = "kong",

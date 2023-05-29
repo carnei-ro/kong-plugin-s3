@@ -5,6 +5,9 @@ services:
   kong:
     image: kong:3.0-ubuntu
     environment:
+      - AWS_REGION=us-east-1
+      - AWS_ROLE_ARN=arn:aws:iam::000000000000:role/my-irsa
+      - AWS_WEB_IDENTITY_TOKEN_FILE=/var/run/secrets/amazonaws.com/serviceaccount/token
       - KONG_PROXY_ACCESS_LOG=/dev/stdout
       - KONG_ADMIN_ACCESS_LOG=/dev/stdout
       - KONG_PROXY_ERROR_LOG=/dev/stderr
